@@ -17,8 +17,7 @@ const CONFIG = {
     : ["*"],
 };
 
-const BOOKING_URL =
-  process.env.BOOKING_URL || "https://adnainfinity.com";
+const BOOKING_URL = process.env.BOOKING_URL || "https://adnainfinity.com";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -120,7 +119,14 @@ function detectIntent(text = "") {
     "la express",
     "pack express",
     "30 min",
-    "60 min"
+    "60 min",
+    "agendar consulta",
+    "agendar cita",
+    "quiero una consulta",
+    "quiero una sesión",
+    "quiero una sesion",
+    "quiero hablar con adna",
+    "quiero reservar una consulta",
   ];
 
   const precios = [
@@ -130,7 +136,7 @@ function detectIntent(text = "") {
     "cuanto cuesta",
     "cuánto vale",
     "cuanto vale",
-    "tarifa"
+    "tarifa",
   ];
 
   const comparacion = [
@@ -141,7 +147,11 @@ function detectIntent(text = "") {
     "qué me conviene",
     "que me conviene",
     "cuál es mejor",
-    "cual es mejor"
+    "cual es mejor",
+    "qué opción me va mejor",
+    "que opcion me va mejor",
+    "qué consulta me recomiendas",
+    "que consulta me recomiendas",
   ];
 
   const saludo = [
@@ -152,7 +162,7 @@ function detectIntent(text = "") {
     "ola",
     "buenos días",
     "buenas tardes",
-    "buenas noches"
+    "buenas noches",
   ];
 
   if (reservar.some((k) => t.includes(k))) return "ready_to_book";
@@ -163,21 +173,23 @@ function detectIntent(text = "") {
 }
 
 function detectStage(history = []) {
-  const userMessages = history.filter((m) => m.role === "user").map((m) => m.content.toLowerCase());
+  const userMessages = history
+    .filter((m) => m.role === "user")
+    .map((m) => m.content.toLowerCase());
 
   const hasAskedPrice = userMessages.some((m) =>
-    ["precio", "precios", "cuánto", "cuanto", "vale", "costa"].some((k) => m.includes(k))
+    ["precio", "precios", "cuánto", "cuanto", "vale", "tarifa"].some((k) =>
+      m.includes(k)
+    )
   );
 
   const hasMentionedBooking = userMessages.some((m) =>
-    ["reservar", "agendar", "cita", "enlace", "quiero hacerlo"].some((k) => m.includes(k))
+    ["reservar", "agendar", "cita", "enlace", "quiero hacerlo"].some((k) =>
+      m.includes(k)
+    )
   );
 
-  const hasChosenOption = userMessages.some((m) =>
-    ["la 1", "la 2", "la 3", "la 4", "esa", "pack express", "express", "30 min", "60 min", "videollamada"].some((k) => m.includes(k))
-  );
-
-  if (hasChosenOption || hasMentionedBooking) return "hot";
+  if (hasMentionedBooking) return "hot";
   if (hasAskedPrice) return "warm";
   return "cold";
 }
@@ -208,21 +220,13 @@ app.post("/chat", async (req, res) => {
   const sessionId = sanitizeText(rawSessionId, 200);
 
   if (!message) {
-    return res.status(400).json({
-      error: "El campo 'message' es obligatorio.",
-    });
+    return res.status(400).json({ error: "El campo 'message' es obligatorio." });
   }
 
   if (!sessionId) {
-    return res.status(400).json({
-      error: "El campo 'sessionId' es obligatorio.",
-    });
-  }
-
-  if (rawHistory && !Array.isArray(rawHistory)) {
-    return res.status(400).json({
-      error: "El campo 'history' debe ser un array.",
-    });
+    return res
+      .status(400)
+      .json({ error: "El campo 'sessionId' es obligatorio." });
   }
 
   const history = sanitizeHistory(rawHistory);
@@ -256,7 +260,7 @@ app.post("/chat", async (req, res) => {
         cliente = { ...cliente, ...updates };
       }
     } catch (err) {
-      console.error("Error guardando/detectando datos cliente:", err.message);
+      console.error("Error guardando cliente:", err.message);
     }
   }
 
@@ -264,103 +268,49 @@ app.post("/chat", async (req, res) => {
   const currentStage = detectStage(history);
   const knownName = cliente?.nombre || "";
 
-  const SYSTEM_PROMPT = `Eres "Luz", la asistente oficial de atención al cliente de Adna Infinity.
+  const SYSTEM_PROMPT = `Eres "Luz", la asistente de atención de Adna Infinity.
 
-Tu función es atender a posibles clientes de forma cercana, amable, espiritual y profesional. Tu objetivo no es solo responder: también debes guiar con inteligencia hacia la reserva cuando notes intención real.
+Tu función es recibir a las personas que llegan al chat, entender qué les preocupa y orientarlas con cercanía hacia la consulta que más puede ayudarles.
 
-Piensa como una closer de ventas excelente, pero natural, cálida y elegante.
-No suenes agresiva, forzada ni robótica.
-No presiones.
-No manipules.
-No cierres en falso.
-Pero sí debes detectar muy bien cuándo la persona está lista y entonces facilitar la reserva sin fricción.
-
-TONO:
+Tu estilo debe ser:
 - cálido
 - cercano
-- femenino
+- humano
+- empático
 - espiritual pero práctico
 - claro
-- seguro
-- breve cuando la persona va decidida
-- empático cuando la persona está perdida o emocional
-- profesional
-- con emojis suaves: ✨💫🔮
+- breve
 
-REGLAS FUNDAMENTALES:
-- Siempre pregunta el nombre si todavía no lo sabes.
-- Si la persona escribe algo breve como "hola", "buenas", "hey", "ok", "sí", "vale" o similar, y aún no sabes su nombre, vuelve a pedirlo con naturalidad.
-- No continúes con una orientación completa hasta saber el nombre, salvo que ya esté detectado.
-- Una vez sepas el nombre, úsalo de forma natural de vez en cuando.
-- No uses Markdown.
-- No uses asteriscos ni texto decorado.
-- No escribas bloques largos innecesarios.
-- No expliques cómo se hacen rituales.
-- No inventes precios ni servicios.
-- No prometas resultados garantizados.
-- No des rodeos si la persona ya va directa.
-- No repitas información que ya acabas de dar.
-- Nunca actúes como soporte técnico. Actúas como asistente comercial cálida y eficiente.
+Usa emojis suaves como:
+✨ 💫 🔮
+
+REGLAS:
+- No suenes como catálogo.
+- Primero escucha el problema.
+- No enumeres servicios si aún no sabes qué le pasa.
+- Nunca pegues la URL directamente.
+- Cuando toque reservar usa exactamente:
+[BOOKING_BUTTON]
 
 SERVICIOS DISPONIBLES:
-1. Consulta Express Tarot — 1 pregunta, audio, 4-5 min — 18 €
-2. Pack Express Tarot — 3 preguntas, audio — 50 €
-3. Consulta de Tarot 30 min — videollamada Instagram o voz — 45 €
-4. Consulta de Tarot 60 min — videollamada Instagram o voz — 85 €
+1. Consulta Express Tarot — 1 pregunta — audio — 18 €
+2. Pack Express Tarot — 3 preguntas — audio — 50 €
+3. Consulta Tarot 30 min — videollamada Instagram o voz — 45 €
+4. Consulta Tarot 60 min — videollamada Instagram o voz — 85 €
 
 IMPORTANTE:
-- Las consultas de 30 y 60 min NO se hacen por WhatsApp videollamada.
-- Si quieren hablar con Adna directamente, explícales que lo harán en la consulta reservada.
-- El enlace de reserva cuando toque es este: ${BOOKING_URL}
+Las videollamadas no se hacen por WhatsApp.
 
-ESTRATEGIA DE CIERRE:
-- Si la persona está explorando, orienta con tacto y pocas preguntas.
-- Si la persona está comparando, aclara diferencias de forma breve y útil.
-- Si la persona está mirando precio, responde claro y después guía al siguiente paso.
-- Si la persona ya eligió opción, no la expliques otra vez.
-- Si la intención de reserva ya está clara, responde breve y pasa el enlace directamente.
-- Si la clienta ya viene decidida, actúa como una closer eficiente: confirmar + enlace + cierre corto.
-- Si falta un dato importante, haz solo una pregunta breve.
-- No preguntes cosas innecesarias cuando el cierre ya está listo.
-
-CUÁNDO CONSIDERAR QUE LA PERSONA YA ESTÁ LISTA:
-- Si dice "quiero reservar", "quiero cita", "agendar", "reserva", "la 2", "esa", "esa misma", "quiero esa", "videollamada", "sí quiero reservar", "pásame el enlace" o similar.
-- Si después de explicar opciones la persona elige una.
-- Si confirma claramente que quiere hacerlo.
-
-FORMA DE RESPONDER CUANDO YA ESTÁ LISTA:
-- Confirmación breve.
-- Enlace directo.
-- Como mucho una frase final corta.
-
-EJEMPLOS CORRECTOS:
-"Perfecto ✨ Puedes reservar directamente aquí:
-${BOOKING_URL}"
-
-"Claro, ${knownName || "guapa"} ✨ Te dejo aquí el enlace para reservar:
-${BOOKING_URL}"
-
-"Perfecto. Reserva aquí tu Pack Express Tarot:
-${BOOKING_URL}"
-
-QUÉ NO HACER CUANDO YA ESTÁ LISTA:
-- No volver a explicar el servicio.
-- No volver a listar precios.
-- No preguntar si quiere más detalles.
-- No alargar la conversación.
+Si la persona quiere reservar usa:
+[BOOKING_BUTTON]
 
 CONTEXTO:
-- Nombre conocido: ${knownName ? "sí" : "no"}
-- Nombre actual: ${knownName || "desconocido"}
-- Tipo de interés detectado: ${cliente?.tipo_interes || "sin detectar"}
-- Intención detectada en este mensaje: ${currentIntent}
-- Temperatura comercial de la conversación: ${currentStage}
+Nombre conocido: ${knownName || "desconocido"}
+Intención detectada: ${currentIntent}
+Temperatura comercial: ${currentStage}
 
-INSTRUCCIÓN FINAL:
-Adapta tu respuesta al nivel de intención del usuario.
-Si está frío, guía.
-Si está tibio, orienta y acerca.
-Si está caliente, cierra.`;
+Responde adaptándote a la situación emocional del cliente.
+`;
 
   const messages = [
     { role: "system", content: SYSTEM_PROMPT },
@@ -374,40 +324,31 @@ Si está caliente, cierra.`;
     const response = await openai.chat.completions.create({
       model: CONFIG.openaiModel,
       messages,
-      max_tokens: 450,
+      max_tokens: 400,
       temperature: 0.7,
     });
 
     reply = cleanReply(
-      response.choices?.[0]?.message?.content?.trim() ||
-      "Lo siento, ha ocurrido un problema. Por favor intenta de nuevo. 🙏"
+      response.choices?.[0]?.message?.content ||
+        "Lo siento, ahora mismo no puedo responder."
     );
   } catch (err) {
-    console.error("OpenAI error:", err?.message || err);
-    reply =
-      "En este momento no puedo responder. Por favor intenta de nuevo en unos segundos. 🙏";
+    console.error("OpenAI error:", err);
+    reply = "Ahora mismo no puedo responder. Inténtalo en unos segundos.";
   }
 
   if (cliente) {
     try {
       await db.guardarMensaje(cliente.id, "assistant", reply);
 
-      const replyLower = reply.toLowerCase();
       if (
         cliente.estado_lead === "nuevo" &&
-        (
-          currentIntent === "ready_to_book" ||
-          replyLower.includes("reservar") ||
-          replyLower.includes("reserva") ||
-          replyLower.includes("consulta") ||
-          replyLower.includes("agendar") ||
-          replyLower.includes("sistema de reservas")
-        )
+        (currentIntent === "ready_to_book" || reply.includes("[BOOKING_BUTTON]"))
       ) {
         await db.actualizarCliente(cliente.id, { estado_lead: "interesado" });
       }
     } catch (err) {
-      console.error("Error guardando respuesta de Luz:", err.message);
+      console.error("Error guardando respuesta:", err.message);
     }
   }
 
@@ -422,49 +363,12 @@ Si está caliente, cierra.`;
 });
 
 /* ════════════════════════════════════════════════
-   404
-════════════════════════════════════════════════ */
-
-app.use((req, res) => {
-  res.status(404).json({
-    error: "Ruta no encontrada.",
-  });
-});
-
-/* ════════════════════════════════════════════════
-   ERROR HANDLER
-════════════════════════════════════════════════ */
-
-app.use((err, req, res, next) => {
-  console.error("SERVER ERROR:", err.message || err);
-
-  if (String(err.message || "").includes("CORS")) {
-    return res.status(403).json({
-      error: "Bloqueado por CORS.",
-    });
-  }
-
-  return res.status(500).json({
-    error: "Error interno del servidor.",
-  });
-});
-
-/* ════════════════════════════════════════════════
    START
 ════════════════════════════════════════════════ */
 
 app.listen(CONFIG.port, () => {
-  console.log(`✅ Servidor Adna Infinity en puerto ${CONFIG.port}`);
-  console.log(`   Modelo:   ${CONFIG.openaiModel}`);
-  console.log(
-    `   Supabase: ${process.env.SUPABASE_URL ? "✅ conectado" : "⚠️  no configurado"}`
-  );
-  console.log(`   Booking:  ${BOOKING_URL}`);
-  console.log(
-    `   CORS:     ${
-      CONFIG.allowedOrigins.includes("*")
-        ? "todos los orígenes permitidos"
-        : CONFIG.allowedOrigins.join(", ")
-    }`
-  );
+  console.log(`Servidor Adna Infinity en puerto ${CONFIG.port}`);
+  console.log(`Modelo: ${CONFIG.openaiModel}`);
+  console.log(`Booking: ${BOOKING_URL}`);
 });
+
