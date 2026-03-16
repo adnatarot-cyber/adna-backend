@@ -221,6 +221,71 @@ app.post("/api/send-booking-confirmation", async (req, res) => {
 });
 
 /* ════════════════════════════════════════════════
+   TELEGRAM NOTIFICACIÓN NUEVA RESERVA
+════════════════════════════════════════════════ */
+
+app.post("/api/notify-booking-telegram", async (req, res) => {
+  try {
+    const {
+      clientName,
+      clientContact,
+      clientEmail,
+      serviceName,
+      bookingDate,
+      bookingTime,
+      paymentMethod,
+      questions,
+    } = req.body;
+
+    if (!clientName || !serviceName || !bookingDate) {
+      return res.status(400).json({
+        error: "Faltan datos obligatorios (clientName, serviceName, bookingDate)",
+      });
+    }
+
+    const msg = [
+      "🔔 Nueva reserva Adna Tarot",
+      "",
+      `👤 Nombre: ${clientName}`,
+      `📞 Teléfono: ${clientContact || "No indicado"}`,
+      `📧 Email: ${clientEmail || "No indicado"}`,
+      `🔮 Servicio: ${serviceName}`,
+      `📅 Fecha: ${bookingDate}`,
+      `⏰ Hora: ${bookingTime || "Sin hora"}`,
+      `💳 Pago: ${paymentMethod || "No indicado"}`,
+      `📝 Consulta: ${questions || "No indicada"}`,
+    ].join("\n");
+
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+
+    if (!token || !chatId) {
+      console.error("Telegram: TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID no configurados");
+      return res.status(500).json({ error: "Telegram no configurado" });
+    }
+
+    const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: msg,
+      }),
+    });
+
+    if (!tgRes.ok) {
+      const errBody = await tgRes.text();
+      throw new Error(`Telegram API error: ${tgRes.status} - ${errBody}`);
+    }
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Error enviando Telegram:", error);
+    res.status(500).json({ error: "No se pudo enviar Telegram" });
+  }
+});
+
+/* ════════════════════════════════════════════════
    404
 ════════════════════════════════════════════════ */
 
