@@ -270,18 +270,16 @@ app.post("/api/notify-booking-telegram", async (req, res) => {
       text: msg,
     };
 
-    if (bookingId) {
-      body.reply_markup = {
-        inline_keyboard: [
-          [
-            {
-              text: "✅ Verificar reserva",
-              url: `https://dashboard-soft-queijadas-b936a3.netlify.app/?section=pagos&bookingId=${bookingId}`,
-            },
-          ],
+    body.reply_markup = {
+      inline_keyboard: [
+        [
+          {
+            text: "✅ Ir al dashboard",
+            url: "https://dashboard-soft-queijadas-b936a3.netlify.app/",
+          },
         ],
-      };
-    }
+      ],
+    };
 
     const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
