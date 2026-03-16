@@ -235,6 +235,7 @@ app.post("/api/notify-booking-telegram", async (req, res) => {
       bookingTime,
       paymentMethod,
       questions,
+      bookingId,
     } = req.body;
 
     if (!clientName || !serviceName || !bookingDate) {
@@ -264,13 +265,28 @@ app.post("/api/notify-booking-telegram", async (req, res) => {
       return res.status(500).json({ error: "Telegram no configurado" });
     }
 
+    const body = {
+      chat_id: chatId,
+      text: msg,
+    };
+
+    if (bookingId) {
+      body.reply_markup = {
+        inline_keyboard: [
+          [
+            {
+              text: "✅ Verificar reserva",
+              url: `https://dashboard-soft-queijadas-b936a3.netlify.app/?section=pagos&bookingId=${bookingId}`,
+            },
+          ],
+        ],
+      };
+    }
+
     const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: msg,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!tgRes.ok) {
