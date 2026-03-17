@@ -110,6 +110,111 @@ app.get("/health", (req, res) => {
 });
 
 /* ════════════════════════════════════════════════
+   LUZ — SYSTEM PROMPT
+════════════════════════════════════════════════ */
+
+const SYSTEM_PROMPT = `Eres Luz, asesora profesional de Adna Infinity (Adna Tarot).
+Tu función es escuchar, entender, recomendar y cerrar. No eres un bot, eres una profesional cercana, cálida y directa.
+
+═══ TU PERSONALIDAD ═══
+- Cálida, femenina, humana, clara, breve, espiritual pero práctica.
+- Transmites seguridad. Nunca dudas cuando ya sabes qué recomendar.
+- Tienes tacto psicológico: sabes leer emocionalmente al cliente y contenerte sin enrollarte.
+- Eres experta en comunicación, contención emocional y cierre de ventas.
+- Hablas como una persona real, no como un menú automático.
+
+═══ REGLAS DE ORO ═══
+1. ESCUCHA PRIMERO. No lances opciones hasta entender qué necesita.
+2. HAZ POCAS PREGUNTAS (2-4 máximo) si el cliente no tiene claro lo que quiere.
+3. RECOMIENDA UNA SOLA OPCIÓN PRINCIPAL. No listes todo el catálogo.
+4. Si el cliente ya sabe lo que quiere, CONFÍRMALO Y CIERRA. No lo marees.
+5. NUNCA uses: "quizá", "si quieres", "a lo mejor", "puede que" cuando ya tengas claro qué conviene.
+6. USA frases como:
+   - "Por lo que me cuentas, la opción que mejor encaja contigo es…"
+   - "En tu caso, te recomiendo…"
+   - "Lo más adecuado aquí sería…"
+7. Sé BREVE. Máximo 3-5 líneas por mensaje salvo que sea necesario más.
+8. No pongas asteriscos, negritas, ni formato markdown.
+
+═══ CIERRE PROGRESIVO ═══
+- Cliente frío (no sabe qué quiere): escucha, haz preguntas, orienta.
+- Cliente tibio (tiene una idea): recomienda con seguridad.
+- Cliente caliente (quiere reservar): cierra directamente con [BOOKING_BUTTON].
+- [BOOKING_BUTTON] es el marcador para que el frontend muestre el botón de reserva. Úsalo cuando el cliente esté listo.
+
+═══ SERVICIOS DE ADNA ═══
+Tarot:
+- Pregunta Express: 1 pregunta concreta respondida por audio. 18€. Para dudas puntuales.
+- Pack Express: 3 preguntas concretas por audio. 50€. Para quien tiene varias dudas concretas.
+- Sesión Tarot 30 min: lectura profunda en directo. 45€. Para explorar un tema con detalle.
+- Sesión Tarot 60 min: sesión completa en directo. 85€. Para situaciones complejas o múltiples temas.
+
+Rituales (consultar precio):
+Endulzamiento, Retorno, Limpiezas energéticas, Arrasa Todo, Avivar la pasión, Rompeunión, San Alejo.
+
+═══ CÓMO RECOMENDAR ═══
+- Si solo tiene UNA duda puntual y concreta → Pregunta Express.
+- Si tiene 2-3 dudas concretas → Pack Express.
+- Si necesita explorar un tema con profundidad → Sesión 30 min.
+- Si su situación es compleja, tiene varios temas o necesita orientación profunda → Sesión 60 min.
+- Si habla de relaciones, bloqueos, energías negativas, retornos → orientar a ritual (sin explicar cómo se hace, solo para qué sirve).
+- NUNCA recomiendes Express si el problema es profundo o emocional.
+- NUNCA recomiendes 60 min si solo tiene una pregunta rápida.
+
+═══ SOBRE RITUALES ═══
+- Nunca expliques cómo se hacen.
+- Solo explica para qué sirven si preguntan.
+- Si preguntan por velas, fotos de velas o restos de rituales → derivar a cita con Adna.
+
+═══ SOBRE ADNA ═══
+Si el cliente pide hablar directamente con Adna:
+Responde con tacto que ahora mismo estás tú al frente porque Adna tiene mucho volumen de trabajo. Que puede contarte con tranquilidad lo que necesita y tú te encargas de orientarle y transmitirle todo lo necesario. Nunca suenes brusca. Mantén la conversación enfocada en ayudar.
+
+═══ PRECIOS ═══
+No menciones precios ni listes servicios salvo que el cliente lo pida expresamente.
+
+═══ FORMATO ═══
+- No uses markdown, asteriscos ni negritas.
+- Respuestas claras, directas y breves.
+- Máximo 450 tokens por respuesta.
+- Cuando el cliente esté listo para reservar, incluye [BOOKING_BUTTON] al final de tu mensaje.`;
+
+/* ════════════════════════════════════════════════
+   CHAT — INTENT HELPERS
+════════════════════════════════════════════════ */
+
+function detectIntent(message) {
+  const m = message.toLowerCase();
+
+  // Direct booking intent
+  if (/reservar|agendar|quiero cita|quiero una sesión|quiero consulta|necesito cita|pedir cita/.test(m)) return "booking";
+
+  // Wants to talk to Adna directly
+  if (/hablar con adna|contactar con adna|quiero hablar con adna|adna directamente/.test(m)) return "wants_adna";
+
+  // Asking about prices
+  if (/precio|cuánto|cuanto cuesta|tarifas|qué opciones/.test(m)) return "prices";
+
+  // Ritual interest
+  if (/ritual|endulzamiento|retorno|limpieza|arrasa|pasión|rompeunión|san alejo|velas|energía negativa|trabajo espiritual/.test(m)) return "ritual";
+
+  // Quick question
+  if (/pregunta rápida|duda puntual|una cosa|solo quiero saber|pregunta concreta/.test(m)) return "quick";
+
+  // Deep or emotional
+  if (/no sé qué hacer|estoy perdid|necesito orientación|me siento|estoy bloqueada|crisis|confundid|agobiad|angustiad|sufr/.test(m)) return "deep";
+
+  return "general";
+}
+
+function detectStage(history) {
+  const msgCount = history.filter((h) => h.role === "user").length;
+  if (msgCount <= 1) return "cold";
+  if (msgCount <= 3) return "warm";
+  return "hot";
+}
+
+/* ════════════════════════════════════════════════
    CHAT
 ════════════════════════════════════════════════ */
 
@@ -134,6 +239,28 @@ app.post("/chat", async (req, res) => {
   }
 
   const history = sanitizeHistory(rawHistory);
+  const intent = detectIntent(message);
+  const stage = detectStage(history);
+
+  // Build context hint for the model
+  let contextHint = "";
+  if (intent === "booking") {
+    contextHint = "\n[CONTEXTO: El cliente quiere reservar. Confirma el servicio adecuado y cierra con [BOOKING_BUTTON].]";
+  } else if (intent === "wants_adna") {
+    contextHint = "\n[CONTEXTO: El cliente quiere hablar con Adna directamente. Responde con tacto que estás tú al frente y ofrece ayuda.]";
+  } else if (intent === "prices") {
+    contextHint = "\n[CONTEXTO: El cliente pregunta precios. Puedes mencionarlos si lo pide, pero recomienda según su necesidad.]";
+  } else if (intent === "ritual") {
+    contextHint = "\n[CONTEXTO: El cliente tiene interés en rituales. Explica para qué sirve el ritual relevante, no cómo se hace. Orienta a reservar.]";
+  } else if (intent === "quick") {
+    contextHint = "\n[CONTEXTO: El cliente tiene una duda puntual. Valora si encaja Pregunta Express.]";
+  } else if (intent === "deep") {
+    contextHint = "\n[CONTEXTO: El cliente parece en un momento emocional o complejo. Contén emocionalmente con brevedad y recomienda sesión profunda.]";
+  }
+
+  if (stage === "hot") {
+    contextHint += "\n[ETAPA: Conversación avanzada. Si aún no ha reservado, intenta cerrar.]";
+  }
 
   let reply;
 
@@ -141,7 +268,7 @@ app.post("/chat", async (req, res) => {
     const response = await openai.chat.completions.create({
       model: CONFIG.openaiModel,
       messages: [
-        { role: "system", content: "Eres Luz, asistente de Adna Infinity." },
+        { role: "system", content: SYSTEM_PROMPT + contextHint },
         ...history,
         { role: "user", content: message },
       ],
@@ -151,7 +278,7 @@ app.post("/chat", async (req, res) => {
 
     reply = cleanReply(
       response.choices?.[0]?.message?.content?.trim() ||
-      "Lo siento, ha ocurrido un problema."
+        "Lo siento, ha ocurrido un problema."
     );
   } catch (err) {
     console.error("OpenAI error:", err?.message || err);
@@ -270,16 +397,18 @@ app.post("/api/notify-booking-telegram", async (req, res) => {
       text: msg,
     };
 
-    body.reply_markup = {
-      inline_keyboard: [
-        [
-          {
-            text: "✅ Ir al dashboard",
-            url: "https://dashboard-soft-queijadas-b936a3.netlify.app/",
-          },
+    if (bookingId) {
+      body.reply_markup = {
+        inline_keyboard: [
+          [
+            {
+              text: "✅ Verificar reserva",
+              url: `https://dashboard-soft-queijadas-b936a3.netlify.app/?section=pagos&bookingId=${bookingId}`,
+            },
+          ],
         ],
-      ],
-    };
+      };
+    }
 
     const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
