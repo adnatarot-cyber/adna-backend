@@ -190,12 +190,17 @@ NO QUIERE AGENDAR TODAVÍA:
 No menciones precios salvo que el cliente lo pida expresamente.
 
 ═══ CÓMO RECOMENDAR ═══
-- UNA duda puntual y concreta → Pregunta Express.
-- 2-3 dudas concretas → Pack Express.
+- UNA sola duda puntual y concreta → Pregunta Express (1 pregunta, audio).
+- Varias preguntas concretas (2-3) → Pack Express (3 preguntas, audio).
+- Si el cliente habla de "varias preguntas", "varias dudas", "tengo 3 preguntas" → Pack Express, NO Pregunta Express.
+- Si el cliente pide algo breve sin especificar cuántas preguntas → presenta las dos opciones breves:
+  · Pregunta Express: para una única duda concreta.
+  · Pack Express: para 3 preguntas concretas en una misma consulta.
+  Y pregunta cuál le encaja.
 - Explorar un tema con profundidad → Sesión 30 min.
 - Situación compleja, varios temas, orientación profunda → Sesión 60 min.
 - Relaciones, bloqueos, energías, retornos → orientar a ritual.
-- NUNCA recomiendes Express si el problema es profundo o emocional.
+- NUNCA recomiendes Express/Pack si el problema es profundo o emocional.
 - NUNCA recomiendes 60 min si solo tiene una pregunta rápida.
 
 ═══ RITUALES ═══
@@ -251,8 +256,11 @@ function detectIntent(message) {
   // Ritual interest
   if (/ritual|endulzamiento|retorno|limpieza energetica|arrasa todo|pasion|rompeunion|san alejo|velas|energia negativa|trabajo espiritual|amarre/.test(m)) return "ritual";
 
-  // Quick question
-  if (/pregunta rapida|duda puntual|una cosa|solo quiero saber|pregunta concreta|duda concreta/.test(m)) return "quick";
+  // Multiple questions → Pack Express
+  if (/varias preguntas|varias dudas|varias cosas|tengo 3|tengo tres|tengo dos|tengo 2|varias consultas|preguntar varias|consulta breve.*varias|pack/.test(m)) return "multiple_questions";
+
+  // Quick single question
+  if (/pregunta rapida|duda puntual|una cosa|solo quiero saber|pregunta concreta|duda concreta|una pregunta|una sola pregunta|consulta breve|tirada rapida|lectura corta|algo breve/.test(m)) return "quick";
 
   // Deep emotional
   if (/no se que hacer|estoy perdid|necesito orientacion|me siento|estoy bloquead|crisis|confundid|agobiad|angustiad|sufr|desesper|no puedo mas|ayuda/.test(m)) return "deep";
@@ -353,7 +361,10 @@ app.post("/chat", async (req, res) => {
       hints.push("[INTERÉS EN RITUALES. Explica para qué sirve. No expliques cómo se hace. Orienta a reservar.]");
       break;
     case "quick":
-      hints.push("[DUDA PUNTUAL. Valora si encaja Pregunta Express o Pack Express.]");
+      hints.push("[DUDA BREVE. Si parece una sola pregunta → Pregunta Express. Si no queda claro cuántas → presenta las dos opciones breves (Express y Pack Express) y pregunta cuál encaja.]");
+      break;
+    case "multiple_questions":
+      hints.push("[TIENE VARIAS PREGUNTAS. Orienta directamente al Pack Express (3 preguntas concretas por audio). No recomiendes Pregunta Express.]");
       break;
     case "deep":
       hints.push("[MOMENTO EMOCIONAL. Contén con brevedad y empatía. Recomienda sesión profunda (30 o 60 min). No recomiendes express.]");
