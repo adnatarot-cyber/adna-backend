@@ -7,6 +7,9 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const OpenAI = require("openai");
+const multer = require("multer");
+const fs = require("fs");
+const path = require("path");
 const db = require("./db");
 
 const CONFIG = {
@@ -58,6 +61,11 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "10kb" }));
+
+// Multer for audio uploads
+const uploadDir = path.join(__dirname, "tmp_uploads");
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+const upload = multer({ dest: uploadDir, limits: { fileSize: 25 * 1024 * 1024 } });
 
 /* ════════════════════════════════════════════════
    HELPERS
@@ -299,39 +307,24 @@ function hasAskedForName(history) {
    CHAT
 ════════════════════════════════════════════════ */
 
-app.post("/chat", async (req, res) => {
-  const rawMessage = req.body?.message;
-  const rawHistory = req.body?.history;
-  const rawSessionId = req.body?.sessionId;
+/* ════════════════════════════════════════════════
+   CHAT — CORE LUZ ENGINE (reusable)
+════════════════════════════════════════════════ */
 
-  const message = sanitizeText(rawMessage, 2000);
-  const sessionId = sanitizeText(rawSessionId, 200);
-
-  if (!message) {
-    return res.status(400).json({ error: "El campo 'message' es obligatorio." });
-  }
-
-  if (!sessionId) {
-    return res.status(400).json({ error: "El campo 'sessionId' es obligatorio." });
-  }
-
-  const history = sanitizeHistory(rawHistory);
+async function generateLuzReply(message, history) {
   const intent = detectIntent(message);
   const stage = detectStage(history);
   const clientName = extractName([...history, { role: "user", content: message }]);
   const alreadyAskedName = hasAskedForName(history);
 
-  // Build dynamic context hints
   let hints = [];
 
-  // Name context
   if (clientName) {
     hints.push(`[NOMBRE DEL CLIENTE: ${clientName}. Úsalo con naturalidad.]`);
   } else if (!alreadyAskedName && stage !== "cold") {
     hints.push("[AÚN NO CONOCES EL NOMBRE. Pídelo pronto de forma natural si la conversación continúa.]");
   }
 
-  // Intent context
   switch (intent) {
     case "greeting":
       hints.push("[SALUDO. Preséntate brevemente y pregunta qué necesita. No sueltes opciones.]");
@@ -374,14 +367,11 @@ app.post("/chat", async (req, res) => {
       break;
   }
 
-  // Stage context
   if (stage === "hot" && intent !== "not_now") {
     hints.push("[CONVERSACIÓN AVANZADA. Si aún no ha reservado y muestra interés, intenta cerrar con [BOOKING_BUTTON].]");
   }
 
   const contextBlock = hints.length > 0 ? "\n\n" + hints.join("\n") : "";
-
-  let reply;
 
   try {
     const response = await openai.chat.completions.create({
@@ -395,16 +385,93 @@ app.post("/chat", async (req, res) => {
       temperature: 0.7,
     });
 
-    reply = cleanReply(
+    return cleanReply(
       response.choices?.[0]?.message?.content?.trim() ||
         "Lo siento, ha ocurrido un problema."
     );
   } catch (err) {
     console.error("OpenAI error:", err?.message || err);
-    reply = "En este momento no puedo responder. Por favor intenta de nuevo.";
+    return "En este momento no puedo responder. Por favor intenta de nuevo.";
+  }
+}
+
+/* ════════════════════════════════════════════════
+   CHAT (text)
+════════════════════════════════════════════════ */
+
+app.post("/chat", async (req, res) => {
+  const rawMessage = req.body?.message;
+  const rawHistory = req.body?.history;
+  const rawSessionId = req.body?.sessionId;
+
+  const message = sanitizeText(rawMessage, 2000);
+  const sessionId = sanitizeText(rawSessionId, 200);
+
+  if (!message) {
+    return res.status(400).json({ error: "El campo 'message' es obligatorio." });
   }
 
+  if (!sessionId) {
+    return res.status(400).json({ error: "El campo 'sessionId' es obligatorio." });
+  }
+
+  const history = sanitizeHistory(rawHistory);
+  const reply = await generateLuzReply(message, history);
+
   return res.json({ reply });
+});
+
+/* ════════════════════════════════════════════════
+   CHAT-AUDIO (voice → text → Luz)
+════════════════════════════════════════════════ */
+
+app.post("/chat-audio", upload.single("audio"), async (req, res) => {
+  let filePath = null;
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No se recibió archivo de audio." });
+    }
+
+    filePath = req.file.path;
+    const rawSessionId = req.body?.sessionId;
+    const rawHistory = req.body?.history;
+
+    const sessionId = sanitizeText(rawSessionId, 200);
+    if (!sessionId) {
+      return res.status(400).json({ error: "El campo 'sessionId' es obligatorio." });
+    }
+
+    const history = sanitizeHistory(
+      typeof rawHistory === "string" ? JSON.parse(rawHistory) : rawHistory
+    );
+
+    // Transcribe with Whisper
+    const transcription = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(filePath),
+      model: "whisper-1",
+      language: "es",
+    });
+
+    const transcript = (transcription.text || "").trim();
+
+    if (!transcript) {
+      return res.status(400).json({ error: "No se pudo transcribir el audio." });
+    }
+
+    // Generate Luz reply using same engine
+    const reply = await generateLuzReply(transcript, history);
+
+    return res.json({ transcript, reply });
+  } catch (err) {
+    console.error("Error en /chat-audio:", err?.message || err);
+    return res.status(500).json({ error: "Error procesando el audio." });
+  } finally {
+    // Clean up temp file
+    if (filePath) {
+      try { fs.unlinkSync(filePath); } catch {}
+    }
+  }
 });
 
 /* ════════════════════════════════════════════════
