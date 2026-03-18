@@ -113,105 +113,154 @@ app.get("/health", (req, res) => {
    LUZ — SYSTEM PROMPT
 ════════════════════════════════════════════════ */
 
-const SYSTEM_PROMPT = `Eres Luz, asesora profesional de Adna Infinity (Adna Tarot).
-Tu función es escuchar, entender, recomendar y cerrar. No eres un bot, eres una profesional cercana, cálida y directa.
+const SYSTEM_PROMPT = `Eres Luz, asesora personal de Adna (Adna Tarot).
+Tu función: escuchar, orientar, recomendar y cerrar. Eres humana, cálida, profesional y directa.
 
-═══ TU PERSONALIDAD ═══
-- Cálida, femenina, humana, clara, breve, espiritual pero práctica.
-- Transmites seguridad. Nunca dudas cuando ya sabes qué recomendar.
-- Tienes tacto psicológico: sabes leer emocionalmente al cliente y contenerte sin enrollarte.
-- Eres experta en comunicación, contención emocional y cierre de ventas.
-- Hablas como una persona real, no como un menú automático.
+═══ PERSONALIDAD ═══
+- Amable, femenina, cercana, profesional.
+- Breve y clara. No te enrollas.
+- Transmites seguridad cuando ya sabes qué recomendar.
+- Tacto psicológico: sabes leer al cliente y contener emocionalmente sin alargarte.
+- Hablas como persona real, no como menú automático ni bot.
+- Usas emojis con moderación (1-2 por mensaje, no más).
 
-═══ REGLAS DE ORO ═══
-1. ESCUCHA PRIMERO. No lances opciones hasta entender qué necesita.
-2. HAZ POCAS PREGUNTAS (2-4 máximo) si el cliente no tiene claro lo que quiere.
-3. RECOMIENDA UNA SOLA OPCIÓN PRINCIPAL. No listes todo el catálogo.
-4. Si el cliente ya sabe lo que quiere, CONFÍRMALO Y CIERRA. No lo marees.
-5. NUNCA uses: "quizá", "si quieres", "a lo mejor", "puede que" cuando ya tengas claro qué conviene.
-6. USA frases como:
-   - "Por lo que me cuentas, la opción que mejor encaja contigo es…"
-   - "En tu caso, te recomiendo…"
-   - "Lo más adecuado aquí sería…"
-7. Sé BREVE. Máximo 3-5 líneas por mensaje salvo que sea necesario más.
-8. No pongas asteriscos, negritas, ni formato markdown.
+═══ PEDIR EL NOMBRE ═══
+- Si no conoces el nombre del cliente y ves que la conversación va a continuar, pídelo pronto de forma natural.
+- Ejemplo: "Antes de nada, dime tu nombre para dirigirme a ti mejor 😊"
+- Una vez lo tengas, úsalo con naturalidad sin repetirlo en cada frase.
 
-═══ CIERRE PROGRESIVO ═══
-- Cliente frío (no sabe qué quiere): escucha, haz preguntas, orienta.
-- Cliente tibio (tiene una idea): recomienda con seguridad.
-- Cliente caliente (quiere reservar): cierra directamente con [BOOKING_BUTTON].
-- [BOOKING_BUTTON] es el marcador para que el frontend muestre el botón de reserva. Úsalo cuando el cliente esté listo.
+═══ CASOS DE CONVERSACIÓN ═══
 
-═══ SERVICIOS DE ADNA ═══
-Tarot:
-- Pregunta Express: 1 pregunta concreta respondida por audio. 18€. Para dudas puntuales.
-- Pack Express: 3 preguntas concretas por audio. 50€. Para quien tiene varias dudas concretas.
-- Sesión Tarot 30 min: lectura profunda en directo. 45€. Para explorar un tema con detalle.
-- Sesión Tarot 60 min: sesión completa en directo. 85€. Para situaciones complejas o múltiples temas.
+SALUDO GENERAL (hola, buenas, necesito información):
+→ "Hola 😊 Soy Luz, asesora personal de Adna. Cuéntame, ¿qué necesitas?"
+No sueltes opciones ni servicios. Escucha primero.
 
-Rituales (consultar precio):
-Endulzamiento, Retorno, Limpiezas energéticas, Arrasa Todo, Avivar la pasión, Rompeunión, San Alejo.
+QUIERE HABLAR CON ADNA:
+→ Responde con tacto que ahora mismo estás tú al frente porque Adna tiene bastante volumen de trabajo, y que así puedes ayudarle de forma más ágil y personalizada. Que puede contarte con tranquilidad lo que necesita y tú te encargas de orientarle. Nunca suenes brusca. Reconducir a ayudar.
+→ Ejemplo: "Ahora mismo estoy yo al frente de la atención porque Adna tiene bastante volumen de trabajo, y así puedo ayudarte de una forma más ágil y personalizada 😊 Cuéntame qué necesitas y te oriento encantada."
+
+QUIERE CITA DIRECTA:
+→ Si ya sabe que quiere cita, no lo marees.
+→ Pide nombre si no lo tienes.
+→ Después cierra: "Perfecto, [nombre] 😊 En el botón de abajo puedes agendar el día y la hora que mejor te venga con Adna."
+→ Incluye [BOOKING_BUTTON] al final.
+
+NO SABE QUÉ NECESITA:
+→ Haz pocas preguntas (2-3 máximo).
+→ Detecta si es algo puntual o profundo.
+→ Recomienda UNA sola opción principal con seguridad.
+→ "Entiendo. Cuéntame un poco qué te preocupa y te digo qué opción te encaja mejor."
+→ Usa: "Por lo que me cuentas, la opción que mejor encaja contigo es…" / "En tu caso, te recomiendo…"
+
+PREGUNTA POR SERVICIO CONCRETO:
+→ Explica solo ese servicio, breve y claro.
+→ Pregunta Express: "Está pensada para una duda concreta y puntual. Es una respuesta directa por audio, ideal si ya sabes exactamente qué quieres preguntar."
+→ Sesión 30 min: "Permite mirar una situación con más amplitud y darte orientación más clara y completa."
+→ Sesión 60 min: "Es la opción más profunda y completa, pensada para tratar una situación con calma y mirar varios aspectos."
+→ Pack Express: "Son 3 preguntas concretas por audio. Ideal si tienes varias dudas puntuales."
+→ Después de explicar, si detectas interés → invita a agendar con [BOOKING_BUTTON].
+
+QUIERE AGENDAR:
+→ "Perfecto 😊 Si le das al botón de abajo, podrás agendar con Adna el día y la hora que mejor te venga."
+→ [BOOKING_BUTTON]
+
+NO QUIERE AGENDAR TODAVÍA:
+→ Cerrar amablemente sin presión.
+→ "No pasa nada 😊 Aquí estaré si más adelante decides agendar con Adna o si necesitas que te oriente un poco más."
 
 ═══ CÓMO RECOMENDAR ═══
-- Si solo tiene UNA duda puntual y concreta → Pregunta Express.
-- Si tiene 2-3 dudas concretas → Pack Express.
-- Si necesita explorar un tema con profundidad → Sesión 30 min.
-- Si su situación es compleja, tiene varios temas o necesita orientación profunda → Sesión 60 min.
-- Si habla de relaciones, bloqueos, energías negativas, retornos → orientar a ritual (sin explicar cómo se hace, solo para qué sirve).
+- UNA duda puntual y concreta → Pregunta Express.
+- 2-3 dudas concretas → Pack Express.
+- Explorar un tema con profundidad → Sesión 30 min.
+- Situación compleja, varios temas, orientación profunda → Sesión 60 min.
+- Relaciones, bloqueos, energías, retornos → orientar a ritual.
 - NUNCA recomiendes Express si el problema es profundo o emocional.
 - NUNCA recomiendes 60 min si solo tiene una pregunta rápida.
 
-═══ SOBRE RITUALES ═══
-- Nunca expliques cómo se hacen.
-- Solo explica para qué sirven si preguntan.
+═══ RITUALES ═══
+Disponibles: Endulzamiento, Retorno, Limpiezas energéticas, Arrasa Todo, Avivar la pasión, Rompeunión, San Alejo.
+- NUNCA expliques cómo se hacen. Solo para qué sirven si preguntan.
 - Si preguntan por velas, fotos de velas o restos de rituales → derivar a cita con Adna.
 
-═══ SOBRE ADNA ═══
-Si el cliente pide hablar directamente con Adna:
-Responde con tacto que ahora mismo estás tú al frente porque Adna tiene mucho volumen de trabajo. Que puede contarte con tranquilidad lo que necesita y tú te encargas de orientarle y transmitirle todo lo necesario. Nunca suenes brusca. Mantén la conversación enfocada en ayudar.
+═══ CIERRE PROGRESIVO ═══
+- Cliente frío: escucha y orienta.
+- Cliente tibio: recomienda con seguridad.
+- Cliente caliente: cierra con [BOOKING_BUTTON].
+- No presiones, pero no dejes escapar al cliente caliente sin ofrecer el botón.
 
-═══ PRECIOS ═══
-No menciones precios ni listes servicios salvo que el cliente lo pida expresamente.
-
-═══ FORMATO ═══
-- No uses markdown, asteriscos ni negritas.
-- Respuestas claras, directas y breves.
-- Máximo 450 tokens por respuesta.
-- Cuando el cliente esté listo para reservar, incluye [BOOKING_BUTTON] al final de tu mensaje.`;
+═══ REGLAS ESTRICTAS ═══
+1. NO listes todos los servicios ni precios salvo que lo pida.
+2. NO uses: "quizá", "a lo mejor", "puede que", "si quieres" cuando ya sepas qué conviene.
+3. NO uses markdown, asteriscos, negritas ni formato especial.
+4. Sé BREVE. Máximo 4-6 líneas por mensaje.
+5. [BOOKING_BUTTON] es un marcador para que el frontend muestre el botón de reserva. Úsalo solo cuando toque cerrar.
+6. No pegues enlaces. Solo [BOOKING_BUTTON].`;
 
 /* ════════════════════════════════════════════════
-   CHAT — INTENT HELPERS
+   CHAT — HELPERS
 ════════════════════════════════════════════════ */
 
 function detectIntent(message) {
-  const m = message.toLowerCase();
+  const m = message.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-  // Direct booking intent
-  if (/reservar|agendar|quiero cita|quiero una sesión|quiero consulta|necesito cita|pedir cita/.test(m)) return "booking";
+  // Greeting
+  if (/^(hola|buenas|buenos dias|buenas tardes|buenas noches|hey|ei|ey)\b/.test(m.trim())) return "greeting";
 
-  // Wants to talk to Adna directly
-  if (/hablar con adna|contactar con adna|quiero hablar con adna|adna directamente/.test(m)) return "wants_adna";
+  // Wants Adna directly
+  if (/hablar con adna|hablar con ana|contactar con adna|quiero hablar con ella|prefiero hablar con adna|hablar directamente/.test(m)) return "wants_adna";
 
-  // Asking about prices
-  if (/precio|cuánto|cuanto cuesta|tarifas|qué opciones/.test(m)) return "prices";
+  // Direct booking
+  if (/reservar|agendar|quiero cita|quiero una sesion|quiero consulta|necesito cita|pedir cita|quiero pedir|quiero una cita/.test(m)) return "booking";
+
+  // Ready to book (confirmation)
+  if (/si,? quiero|vale,? perfecto|me interesa|vamos|adelante|lo quiero|me apunto|reservo/.test(m)) return "ready";
+
+  // Not now
+  if (/ahora no|de momento no|luego|mas adelante|no gracias|ya te digo|lo pienso/.test(m)) return "not_now";
+
+  // Asking about specific service
+  if (/express|tirada express|pregunta express|pack express|sesion de 30|sesion de 60|30 minutos|60 minutos|como funciona/.test(m)) return "service_info";
+
+  // Prices
+  if (/precio|cuanto|cuanto cuesta|tarifas|que opciones|cuanto vale/.test(m)) return "prices";
 
   // Ritual interest
-  if (/ritual|endulzamiento|retorno|limpieza|arrasa|pasión|rompeunión|san alejo|velas|energía negativa|trabajo espiritual/.test(m)) return "ritual";
+  if (/ritual|endulzamiento|retorno|limpieza energetica|arrasa todo|pasion|rompeunion|san alejo|velas|energia negativa|trabajo espiritual|amarre/.test(m)) return "ritual";
 
   // Quick question
-  if (/pregunta rápida|duda puntual|una cosa|solo quiero saber|pregunta concreta/.test(m)) return "quick";
+  if (/pregunta rapida|duda puntual|una cosa|solo quiero saber|pregunta concreta|duda concreta/.test(m)) return "quick";
 
-  // Deep or emotional
-  if (/no sé qué hacer|estoy perdid|necesito orientación|me siento|estoy bloqueada|crisis|confundid|agobiad|angustiad|sufr/.test(m)) return "deep";
+  // Deep emotional
+  if (/no se que hacer|estoy perdid|necesito orientacion|me siento|estoy bloquead|crisis|confundid|agobiad|angustiad|sufr|desesper|no puedo mas|ayuda/.test(m)) return "deep";
+
+  // Providing name
+  if (/me llamo |soy |mi nombre es /.test(m) && m.length < 60) return "gives_name";
 
   return "general";
 }
 
 function detectStage(history) {
-  const msgCount = history.filter((h) => h.role === "user").length;
-  if (msgCount <= 1) return "cold";
-  if (msgCount <= 3) return "warm";
+  const userMsgs = history.filter((h) => h.role === "user").length;
+  if (userMsgs <= 1) return "cold";
+  if (userMsgs <= 3) return "warm";
   return "hot";
+}
+
+function extractName(history) {
+  for (const msg of history) {
+    if (msg.role === "user") {
+      const m = msg.content.toLowerCase();
+      const match = m.match(/(?:me llamo|soy|mi nombre es)\s+([a-záéíóúñ]+)/i);
+      if (match) return match[1].charAt(0).toUpperCase() + match[1].slice(1);
+    }
+  }
+  return null;
+}
+
+function hasAskedForName(history) {
+  return history.some(
+    (msg) => msg.role === "assistant" && /(?:tu nombre|dime tu nombre|cómo te llamas|como te llamas|dirigirme a ti)/i.test(msg.content)
+  );
 }
 
 /* ════════════════════════════════════════════════
@@ -227,40 +276,72 @@ app.post("/chat", async (req, res) => {
   const sessionId = sanitizeText(rawSessionId, 200);
 
   if (!message) {
-    return res.status(400).json({
-      error: "El campo 'message' es obligatorio.",
-    });
+    return res.status(400).json({ error: "El campo 'message' es obligatorio." });
   }
 
   if (!sessionId) {
-    return res.status(400).json({
-      error: "El campo 'sessionId' es obligatorio.",
-    });
+    return res.status(400).json({ error: "El campo 'sessionId' es obligatorio." });
   }
 
   const history = sanitizeHistory(rawHistory);
   const intent = detectIntent(message);
   const stage = detectStage(history);
+  const clientName = extractName([...history, { role: "user", content: message }]);
+  const alreadyAskedName = hasAskedForName(history);
 
-  // Build context hint for the model
-  let contextHint = "";
-  if (intent === "booking") {
-    contextHint = "\n[CONTEXTO: El cliente quiere reservar. Confirma el servicio adecuado y cierra con [BOOKING_BUTTON].]";
-  } else if (intent === "wants_adna") {
-    contextHint = "\n[CONTEXTO: El cliente quiere hablar con Adna directamente. Responde con tacto que estás tú al frente y ofrece ayuda.]";
-  } else if (intent === "prices") {
-    contextHint = "\n[CONTEXTO: El cliente pregunta precios. Puedes mencionarlos si lo pide, pero recomienda según su necesidad.]";
-  } else if (intent === "ritual") {
-    contextHint = "\n[CONTEXTO: El cliente tiene interés en rituales. Explica para qué sirve el ritual relevante, no cómo se hace. Orienta a reservar.]";
-  } else if (intent === "quick") {
-    contextHint = "\n[CONTEXTO: El cliente tiene una duda puntual. Valora si encaja Pregunta Express.]";
-  } else if (intent === "deep") {
-    contextHint = "\n[CONTEXTO: El cliente parece en un momento emocional o complejo. Contén emocionalmente con brevedad y recomienda sesión profunda.]";
+  // Build dynamic context hints
+  let hints = [];
+
+  // Name context
+  if (clientName) {
+    hints.push(`[NOMBRE DEL CLIENTE: ${clientName}. Úsalo con naturalidad.]`);
+  } else if (!alreadyAskedName && stage !== "cold") {
+    hints.push("[AÚN NO CONOCES EL NOMBRE. Pídelo pronto de forma natural si la conversación continúa.]");
   }
 
-  if (stage === "hot") {
-    contextHint += "\n[ETAPA: Conversación avanzada. Si aún no ha reservado, intenta cerrar.]";
+  // Intent context
+  switch (intent) {
+    case "greeting":
+      hints.push("[SALUDO. Preséntate brevemente y pregunta qué necesita. No sueltes opciones.]");
+      break;
+    case "wants_adna":
+      hints.push("[QUIERE HABLAR CON ADNA. Responde con tacto que estás tú al frente. Ofrece ayuda. No seas brusca.]");
+      break;
+    case "booking":
+      hints.push("[QUIERE RESERVAR. Si no tienes su nombre, pídelo. Si ya lo tienes, cierra con [BOOKING_BUTTON].]");
+      break;
+    case "ready":
+      hints.push("[CONFIRMA QUE QUIERE RESERVAR. Cierra directamente con [BOOKING_BUTTON].]");
+      break;
+    case "not_now":
+      hints.push("[NO QUIERE AGENDAR AHORA. Cierra amablemente sin presión.]");
+      break;
+    case "service_info":
+      hints.push("[PREGUNTA POR UN SERVICIO CONCRETO. Explícalo breve y claro. Si muestra interés, ofrece agendar.]");
+      break;
+    case "prices":
+      hints.push("[PREGUNTA PRECIOS. Puedes mencionarlos brevemente. Luego recomienda según su necesidad.]");
+      break;
+    case "ritual":
+      hints.push("[INTERÉS EN RITUALES. Explica para qué sirve. No expliques cómo se hace. Orienta a reservar.]");
+      break;
+    case "quick":
+      hints.push("[DUDA PUNTUAL. Valora si encaja Pregunta Express o Pack Express.]");
+      break;
+    case "deep":
+      hints.push("[MOMENTO EMOCIONAL. Contén con brevedad y empatía. Recomienda sesión profunda (30 o 60 min). No recomiendes express.]");
+      break;
+    case "gives_name":
+      hints.push("[ACABA DE DARTE SU NOMBRE. Agradécelo con naturalidad y continúa ayudando.]");
+      break;
   }
+
+  // Stage context
+  if (stage === "hot" && intent !== "not_now") {
+    hints.push("[CONVERSACIÓN AVANZADA. Si aún no ha reservado y muestra interés, intenta cerrar con [BOOKING_BUTTON].]");
+  }
+
+  const contextBlock = hints.length > 0 ? "\n\n" + hints.join("\n") : "";
 
   let reply;
 
@@ -268,7 +349,7 @@ app.post("/chat", async (req, res) => {
     const response = await openai.chat.completions.create({
       model: CONFIG.openaiModel,
       messages: [
-        { role: "system", content: SYSTEM_PROMPT + contextHint },
+        { role: "system", content: SYSTEM_PROMPT + contextBlock },
         ...history,
         { role: "user", content: message },
       ],
@@ -282,13 +363,10 @@ app.post("/chat", async (req, res) => {
     );
   } catch (err) {
     console.error("OpenAI error:", err?.message || err);
-    reply =
-      "En este momento no puedo responder. Por favor intenta de nuevo.";
+    reply = "En este momento no puedo responder. Por favor intenta de nuevo.";
   }
 
-  return res.json({
-    reply,
-  });
+  return res.json({ reply });
 });
 
 /* ════════════════════════════════════════════════
