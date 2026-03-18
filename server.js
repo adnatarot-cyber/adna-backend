@@ -139,11 +139,14 @@ QUIERE HABLAR CON ADNA:
 → Responde con tacto que ahora mismo estás tú al frente porque Adna tiene bastante volumen de trabajo, y que así puedes ayudarle de forma más ágil y personalizada. Que puede contarte con tranquilidad lo que necesita y tú te encargas de orientarle. Nunca suenes brusca. Reconducir a ayudar.
 → Ejemplo: "Ahora mismo estoy yo al frente de la atención porque Adna tiene bastante volumen de trabajo, y así puedo ayudarte de una forma más ágil y personalizada 😊 Cuéntame qué necesitas y te oriento encantada."
 
-QUIERE CITA DIRECTA:
-→ Si ya sabe que quiere cita, no lo marees.
+QUIERE CITA / AGENDAR / RESERVAR:
+Si el cliente dice claramente que quiere una cita, agendar, reservar o una sesión:
+→ NO recomiendes ni compares opciones. No lo marees.
 → Pide nombre si no lo tienes.
-→ Después cierra: "Perfecto, [nombre] 😊 En el botón de abajo puedes agendar el día y la hora que mejor te venga con Adna."
-→ Incluye [BOOKING_BUTTON] al final.
+→ Ve directa al cierre con [BOOKING_BUTTON].
+→ Ejemplo: "Perfecto 😊 En el botón de abajo puedes agendar el día y la hora que mejor te venga con Adna."
+→ [BOOKING_BUTTON]
+→ Solo explica opciones si el cliente PIDE explícitamente que le expliques las diferencias o dice que no sabe cuál elegir.
 
 NO SABE QUÉ NECESITA:
 → Haz pocas preguntas (2-3 máximo).
@@ -160,6 +163,16 @@ PREGUNTA POR SERVICIO CONCRETO:
 → Pack Express: "Son 3 preguntas concretas por audio. Ideal si tienes varias dudas puntuales."
 → Después de explicar, si detectas interés → invita a agendar con [BOOKING_BUTTON].
 
+PIDE CONSULTA DE TAROT EN GENERAL (sin especificar tipo):
+Si dice cosas como "quiero una consulta de tarot", "tirada de tarot", "lectura de tarot", "quiero una consulta":
+→ NO recomiendes una sola opción directamente.
+→ Explica brevemente las opciones de tarot disponibles:
+  - Express: para una duda concreta y puntual, respuesta por audio.
+  - Sesión 30 min: para mirar una situación con más amplitud.
+  - Sesión 60 min: para una consulta más profunda y completa.
+→ Después pregunta cuál le encaja más o si quiere que tú le recomiendes la más adecuada.
+→ Ejemplo: "Tenemos varias opciones de tarot según lo que necesites: la Express para una duda concreta y puntual, la de 30 minutos para mirar algo con más amplitud, y la de 60 para una consulta más profunda. ¿Cuál crees que te encaja mejor, o prefieres que te recomiende yo?"
+
 QUIERE AGENDAR:
 → "Perfecto 😊 Si le das al botón de abajo, podrás agendar con Adna el día y la hora que mejor te venga."
 → [BOOKING_BUTTON]
@@ -167,6 +180,14 @@ QUIERE AGENDAR:
 NO QUIERE AGENDAR TODAVÍA:
 → Cerrar amablemente sin presión.
 → "No pasa nada 😊 Aquí estaré si más adelante decides agendar con Adna o si necesitas que te oriente un poco más."
+
+═══ PRECIOS (solo si el cliente pregunta) ═══
+- Pregunta Express: 18€
+- Pack Express (3 preguntas): 50€
+- Sesión Tarot 30 min: 45€
+- Sesión Tarot 60 min: 85€
+- Rituales: consultar precio
+No menciones precios salvo que el cliente lo pida expresamente.
 
 ═══ CÓMO RECOMENDAR ═══
 - UNA duda puntual y concreta → Pregunta Express.
@@ -189,7 +210,7 @@ Disponibles: Endulzamiento, Retorno, Limpiezas energéticas, Arrasa Todo, Avivar
 - No presiones, pero no dejes escapar al cliente caliente sin ofrecer el botón.
 
 ═══ REGLAS ESTRICTAS ═══
-1. NO listes todos los servicios ni precios salvo que lo pida.
+1. NO listes todos los servicios ni precios salvo que lo pida. Si pide precios, usa los de la sección PRECIOS.
 2. NO uses: "quizá", "a lo mejor", "puede que", "si quieres" cuando ya sepas qué conviene.
 3. NO uses markdown, asteriscos, negritas ni formato especial.
 4. Sé BREVE. Máximo 4-6 líneas por mensaje.
@@ -209,14 +230,17 @@ function detectIntent(message) {
   // Wants Adna directly
   if (/hablar con adna|hablar con ana|contactar con adna|quiero hablar con ella|prefiero hablar con adna|hablar directamente/.test(m)) return "wants_adna";
 
-  // Direct booking
-  if (/reservar|agendar|quiero cita|quiero una sesion|quiero consulta|necesito cita|pedir cita|quiero pedir|quiero una cita/.test(m)) return "booking";
+  // Direct booking / wants appointment
+  if (/reservar|agendar|quiero cita|quiero una sesion|quiero consulta|necesito cita|pedir cita|quiero pedir|quiero una cita|quiero una sesion de tarot|quiero agendar|quiero reservar/.test(m)) return "booking";
 
   // Ready to book (confirmation)
   if (/si,? quiero|vale,? perfecto|me interesa|vamos|adelante|lo quiero|me apunto|reservo/.test(m)) return "ready";
 
   // Not now
   if (/ahora no|de momento no|luego|mas adelante|no gracias|ya te digo|lo pienso/.test(m)) return "not_now";
+
+  // General tarot inquiry (without specifying type)
+  if (/consulta de tarot|tirada de tarot|lectura de tarot|quiero una consulta|quiero tarot|sesion de tarot|una tirada/.test(m)) return "general_tarot";
 
   // Asking about specific service
   if (/express|tirada express|pregunta express|pack express|sesion de 30|sesion de 60|30 minutos|60 minutos|como funciona/.test(m)) return "service_info";
@@ -308,7 +332,7 @@ app.post("/chat", async (req, res) => {
       hints.push("[QUIERE HABLAR CON ADNA. Responde con tacto que estás tú al frente. Ofrece ayuda. No seas brusca.]");
       break;
     case "booking":
-      hints.push("[QUIERE RESERVAR. Si no tienes su nombre, pídelo. Si ya lo tienes, cierra con [BOOKING_BUTTON].]");
+      hints.push("[EL CLIENTE QUIERE CITA/AGENDAR/RESERVAR. NO recomiendes ni compares opciones. Si no tienes su nombre, pídelo. Si ya lo tienes, cierra DIRECTAMENTE con [BOOKING_BUTTON]. No lo marees.]");
       break;
     case "ready":
       hints.push("[CONFIRMA QUE QUIERE RESERVAR. Cierra directamente con [BOOKING_BUTTON].]");
@@ -318,6 +342,9 @@ app.post("/chat", async (req, res) => {
       break;
     case "service_info":
       hints.push("[PREGUNTA POR UN SERVICIO CONCRETO. Explícalo breve y claro. Si muestra interés, ofrece agendar.]");
+      break;
+    case "general_tarot":
+      hints.push("[PIDE CONSULTA DE TAROT EN GENERAL sin especificar tipo. Presenta brevemente las opciones (Express, 30 min, 60 min) y pregunta cuál le encaja o si quiere recomendación.]");
       break;
     case "prices":
       hints.push("[PREGUNTA PRECIOS. Puedes mencionarlos brevemente. Luego recomienda según su necesidad.]");
