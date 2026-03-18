@@ -7,9 +7,6 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const OpenAI = require("openai");
-const multer = require("multer");
-const fs = require("fs");
-const path = require("path");
 const db = require("./db");
 
 const CONFIG = {
@@ -61,11 +58,6 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "10kb" }));
-
-// Multer for audio uploads
-const uploadDir = path.join(__dirname, "tmp_uploads");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-const upload = multer({ dest: uploadDir, limits: { fileSize: 25 * 1024 * 1024 } });
 
 /* ════════════════════════════════════════════════
    HELPERS
@@ -419,59 +411,6 @@ app.post("/chat", async (req, res) => {
   const reply = await generateLuzReply(message, history);
 
   return res.json({ reply });
-});
-
-/* ════════════════════════════════════════════════
-   CHAT-AUDIO (voice → text → Luz)
-════════════════════════════════════════════════ */
-
-app.post("/chat-audio", upload.single("audio"), async (req, res) => {
-  let filePath = null;
-
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No se recibió archivo de audio." });
-    }
-
-    filePath = req.file.path;
-    const rawSessionId = req.body?.sessionId;
-    const rawHistory = req.body?.history;
-
-    const sessionId = sanitizeText(rawSessionId, 200);
-    if (!sessionId) {
-      return res.status(400).json({ error: "El campo 'sessionId' es obligatorio." });
-    }
-
-    const history = sanitizeHistory(
-      typeof rawHistory === "string" ? JSON.parse(rawHistory) : rawHistory
-    );
-
-    // Transcribe with Whisper
-    const transcription = await openai.audio.transcriptions.create({
-      file: fs.createReadStream(filePath),
-      model: "whisper-1",
-      language: "es",
-    });
-
-    const transcript = (transcription.text || "").trim();
-
-    if (!transcript) {
-      return res.status(400).json({ error: "No se pudo transcribir el audio." });
-    }
-
-    // Generate Luz reply using same engine
-    const reply = await generateLuzReply(transcript, history);
-
-    return res.json({ transcript, reply });
-  } catch (err) {
-    console.error("Error en /chat-audio:", err?.message || err);
-    return res.status(500).json({ error: "Error procesando el audio." });
-  } finally {
-    // Clean up temp file
-    if (filePath) {
-      try { fs.unlinkSync(filePath); } catch {}
-    }
-  }
 });
 
 /* ════════════════════════════════════════════════
