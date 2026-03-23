@@ -8,6 +8,11 @@ const express = require("express");
 const cors = require("cors");
 const OpenAI = require("openai");
 const db = require("./db");
+const { createClient } = require("@supabase/supabase-js");
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY
+);
 
 const CONFIG = {
   port: process.env.PORT || 3000,
@@ -139,14 +144,11 @@ QUIERE HABLAR CON ADNA:
 → Responde con tacto que ahora mismo estás tú al frente porque Adna tiene bastante volumen de trabajo, y que así puedes ayudarle de forma más ágil y personalizada. Que puede contarte con tranquilidad lo que necesita y tú te encargas de orientarle. Nunca suenes brusca. Reconducir a ayudar.
 → Ejemplo: "Ahora mismo estoy yo al frente de la atención porque Adna tiene bastante volumen de trabajo, y así puedo ayudarte de una forma más ágil y personalizada 😊 Cuéntame qué necesitas y te oriento encantada."
 
-QUIERE CITA / AGENDAR / RESERVAR:
-Si el cliente dice claramente que quiere una cita, agendar, reservar o una sesión:
-→ NO recomiendes ni compares opciones. No lo marees.
+QUIERE CITA DIRECTA:
+→ Si ya sabe que quiere cita, no lo marees.
 → Pide nombre si no lo tienes.
-→ Ve directa al cierre con [BOOKING_BUTTON].
-→ Ejemplo: "Perfecto 😊 En el botón de abajo puedes agendar el día y la hora que mejor te venga con Adna."
-→ [BOOKING_BUTTON]
-→ Solo explica opciones si el cliente PIDE explícitamente que le expliques las diferencias o dice que no sabe cuál elegir.
+→ Después cierra: "Perfecto, [nombre] 😊 En el botón de abajo puedes agendar el día y la hora que mejor te venga con Adna."
+→ Incluye [BOOKING_BUTTON] al final.
 
 NO SABE QUÉ NECESITA:
 → Haz pocas preguntas (2-3 máximo).
@@ -190,17 +192,12 @@ NO QUIERE AGENDAR TODAVÍA:
 No menciones precios salvo que el cliente lo pida expresamente.
 
 ═══ CÓMO RECOMENDAR ═══
-- UNA sola duda puntual y concreta → Pregunta Express (1 pregunta, audio).
-- Varias preguntas concretas (2-3) → Pack Express (3 preguntas, audio).
-- Si el cliente habla de "varias preguntas", "varias dudas", "tengo 3 preguntas" → Pack Express, NO Pregunta Express.
-- Si el cliente pide algo breve sin especificar cuántas preguntas → presenta las dos opciones breves:
-  · Pregunta Express: para una única duda concreta.
-  · Pack Express: para 3 preguntas concretas en una misma consulta.
-  Y pregunta cuál le encaja.
+- UNA duda puntual y concreta → Pregunta Express.
+- 2-3 dudas concretas → Pack Express.
 - Explorar un tema con profundidad → Sesión 30 min.
 - Situación compleja, varios temas, orientación profunda → Sesión 60 min.
 - Relaciones, bloqueos, energías, retornos → orientar a ritual.
-- NUNCA recomiendes Express/Pack si el problema es profundo o emocional.
+- NUNCA recomiendes Express si el problema es profundo o emocional.
 - NUNCA recomiendes 60 min si solo tiene una pregunta rápida.
 
 ═══ RITUALES ═══
@@ -235,8 +232,8 @@ function detectIntent(message) {
   // Wants Adna directly
   if (/hablar con adna|hablar con ana|contactar con adna|quiero hablar con ella|prefiero hablar con adna|hablar directamente/.test(m)) return "wants_adna";
 
-  // Direct booking / wants appointment
-  if (/reservar|agendar|quiero cita|quiero una sesion|quiero consulta|necesito cita|pedir cita|quiero pedir|quiero una cita|quiero una sesion de tarot|quiero agendar|quiero reservar/.test(m)) return "booking";
+  // Direct booking
+  if (/reservar|agendar|quiero cita|quiero una sesion|quiero consulta|necesito cita|pedir cita|quiero pedir|quiero una cita/.test(m)) return "booking";
 
   // Ready to book (confirmation)
   if (/si,? quiero|vale,? perfecto|me interesa|vamos|adelante|lo quiero|me apunto|reservo/.test(m)) return "ready";
@@ -256,11 +253,8 @@ function detectIntent(message) {
   // Ritual interest
   if (/ritual|endulzamiento|retorno|limpieza energetica|arrasa todo|pasion|rompeunion|san alejo|velas|energia negativa|trabajo espiritual|amarre/.test(m)) return "ritual";
 
-  // Multiple questions → Pack Express
-  if (/varias preguntas|varias dudas|varias cosas|tengo 3|tengo tres|tengo dos|tengo 2|varias consultas|preguntar varias|consulta breve.*varias|pack/.test(m)) return "multiple_questions";
-
-  // Quick single question
-  if (/pregunta rapida|duda puntual|una cosa|solo quiero saber|pregunta concreta|duda concreta|una pregunta|una sola pregunta|consulta breve|tirada rapida|lectura corta|algo breve/.test(m)) return "quick";
+  // Quick question
+  if (/pregunta rapida|duda puntual|una cosa|solo quiero saber|pregunta concreta|duda concreta/.test(m)) return "quick";
 
   // Deep emotional
   if (/no se que hacer|estoy perdid|necesito orientacion|me siento|estoy bloquead|crisis|confundid|agobiad|angustiad|sufr|desesper|no puedo mas|ayuda/.test(m)) return "deep";
@@ -299,24 +293,39 @@ function hasAskedForName(history) {
    CHAT
 ════════════════════════════════════════════════ */
 
-/* ════════════════════════════════════════════════
-   CHAT — CORE LUZ ENGINE (reusable)
-════════════════════════════════════════════════ */
+app.post("/chat", async (req, res) => {
+  const rawMessage = req.body?.message;
+  const rawHistory = req.body?.history;
+  const rawSessionId = req.body?.sessionId;
 
-async function generateLuzReply(message, history) {
+  const message = sanitizeText(rawMessage, 2000);
+  const sessionId = sanitizeText(rawSessionId, 200);
+
+  if (!message) {
+    return res.status(400).json({ error: "El campo 'message' es obligatorio." });
+  }
+
+  if (!sessionId) {
+    return res.status(400).json({ error: "El campo 'sessionId' es obligatorio." });
+  }
+
+  const history = sanitizeHistory(rawHistory);
   const intent = detectIntent(message);
   const stage = detectStage(history);
   const clientName = extractName([...history, { role: "user", content: message }]);
   const alreadyAskedName = hasAskedForName(history);
 
+  // Build dynamic context hints
   let hints = [];
 
+  // Name context
   if (clientName) {
     hints.push(`[NOMBRE DEL CLIENTE: ${clientName}. Úsalo con naturalidad.]`);
   } else if (!alreadyAskedName && stage !== "cold") {
     hints.push("[AÚN NO CONOCES EL NOMBRE. Pídelo pronto de forma natural si la conversación continúa.]");
   }
 
+  // Intent context
   switch (intent) {
     case "greeting":
       hints.push("[SALUDO. Preséntate brevemente y pregunta qué necesita. No sueltes opciones.]");
@@ -325,7 +334,7 @@ async function generateLuzReply(message, history) {
       hints.push("[QUIERE HABLAR CON ADNA. Responde con tacto que estás tú al frente. Ofrece ayuda. No seas brusca.]");
       break;
     case "booking":
-      hints.push("[EL CLIENTE QUIERE CITA/AGENDAR/RESERVAR. NO recomiendes ni compares opciones. Si no tienes su nombre, pídelo. Si ya lo tienes, cierra DIRECTAMENTE con [BOOKING_BUTTON]. No lo marees.]");
+      hints.push("[QUIERE RESERVAR. Si no tienes su nombre, pídelo. Si ya lo tienes, cierra con [BOOKING_BUTTON].]");
       break;
     case "ready":
       hints.push("[CONFIRMA QUE QUIERE RESERVAR. Cierra directamente con [BOOKING_BUTTON].]");
@@ -346,10 +355,7 @@ async function generateLuzReply(message, history) {
       hints.push("[INTERÉS EN RITUALES. Explica para qué sirve. No expliques cómo se hace. Orienta a reservar.]");
       break;
     case "quick":
-      hints.push("[DUDA BREVE. Si parece una sola pregunta → Pregunta Express. Si no queda claro cuántas → presenta las dos opciones breves (Express y Pack Express) y pregunta cuál encaja.]");
-      break;
-    case "multiple_questions":
-      hints.push("[TIENE VARIAS PREGUNTAS. Orienta directamente al Pack Express (3 preguntas concretas por audio). No recomiendes Pregunta Express.]");
+      hints.push("[DUDA PUNTUAL. Valora si encaja Pregunta Express o Pack Express.]");
       break;
     case "deep":
       hints.push("[MOMENTO EMOCIONAL. Contén con brevedad y empatía. Recomienda sesión profunda (30 o 60 min). No recomiendes express.]");
@@ -359,11 +365,14 @@ async function generateLuzReply(message, history) {
       break;
   }
 
+  // Stage context
   if (stage === "hot" && intent !== "not_now") {
     hints.push("[CONVERSACIÓN AVANZADA. Si aún no ha reservado y muestra interés, intenta cerrar con [BOOKING_BUTTON].]");
   }
 
   const contextBlock = hints.length > 0 ? "\n\n" + hints.join("\n") : "";
+
+  let reply;
 
   try {
     const response = await openai.chat.completions.create({
@@ -377,40 +386,58 @@ async function generateLuzReply(message, history) {
       temperature: 0.7,
     });
 
-    return cleanReply(
+    reply = cleanReply(
       response.choices?.[0]?.message?.content?.trim() ||
         "Lo siento, ha ocurrido un problema."
     );
   } catch (err) {
     console.error("OpenAI error:", err?.message || err);
-    return "En este momento no puedo responder. Por favor intenta de nuevo.";
+    reply = "En este momento no puedo responder. Por favor intenta de nuevo.";
   }
-}
+
+  // Save messages to Supabase (non-blocking)
+  try {
+    await supabase.from("mensajes").insert([
+      { session_id: sessionId, role: "user", content: message, created_at: new Date().toISOString() },
+      { session_id: sessionId, role: "assistant", content: reply, created_at: new Date().toISOString() },
+    ]);
+  } catch (dbErr) {
+    console.error("Error guardando mensajes:", dbErr);
+  }
+
+  return res.json({ reply, sessionId });
+});
 
 /* ════════════════════════════════════════════════
-   CHAT (text)
+   CHAT HISTORY (retrieve by sessionId)
 ════════════════════════════════════════════════ */
 
-app.post("/chat", async (req, res) => {
-  const rawMessage = req.body?.message;
-  const rawHistory = req.body?.history;
-  const rawSessionId = req.body?.sessionId;
-
-  const message = sanitizeText(rawMessage, 2000);
-  const sessionId = sanitizeText(rawSessionId, 200);
-
-  if (!message) {
-    return res.status(400).json({ error: "El campo 'message' es obligatorio." });
-  }
+app.get("/chat-history", async (req, res) => {
+  const sessionId = (req.query.sessionId || "").trim();
 
   if (!sessionId) {
-    return res.status(400).json({ error: "El campo 'sessionId' es obligatorio." });
+    return res.status(400).json({ error: "sessionId es obligatorio." });
   }
 
-  const history = sanitizeHistory(rawHistory);
-  const reply = await generateLuzReply(message, history);
+  try {
+    const { data, error } = await supabase
+      .from("mensajes")
+      .select("role, content, created_at")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: true });
 
-  return res.json({ reply });
+    if (error) throw error;
+
+    const messages = (data || []).map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    return res.json({ sessionId, messages });
+  } catch (err) {
+    console.error("Error cargando historial:", err);
+    return res.status(500).json({ error: "No se pudo cargar el historial." });
+  }
 });
 
 /* ════════════════════════════════════════════════
