@@ -458,10 +458,23 @@ app.post("/api/notify-booking-telegram", async (req, res) => {
       body: JSON.stringify(body),
     });
 
-    if (!tgRes.ok) {
-      const errBody = await tgRes.text();
-      throw new Error(`Telegram API error: ${tgRes.status} - ${errBody}`);
+    const tgData = await tgRes.json().catch(() => ({}));
+
+    if (!tgRes.ok || !tgData.ok) {
+      console.error("Telegram ERROR:", {
+        status: tgRes.status,
+        error_code: tgData.error_code,
+        description: tgData.description,
+      });
+      return res.status(502).json({ error: "No se pudo enviar Telegram" });
     }
+
+    console.log("Telegram OK:", {
+      message_id: tgData.result?.message_id,
+      chat_id: tgData.result?.chat?.id,
+      chat_type: tgData.result?.chat?.type,
+      chat_title: tgData.result?.chat?.title,
+    });
 
     res.json({ ok: true });
   } catch (error) {
